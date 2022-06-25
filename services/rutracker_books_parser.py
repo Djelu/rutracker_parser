@@ -1,8 +1,3 @@
-import json
-import os
-import pickle
-import time
-import numpy
 import asyncio
 import aiohttp
 
@@ -19,12 +14,6 @@ class Parser:
         self.session = {}
         self.login_url = "https://rutracker.org/forum/login.php"
         self.book_search_url = "https://rutracker.org/forum/tracker.php?f=2387"
-        # if ids is not None:
-        #     self.book_urls = list(map(
-        #         lambda id: f"https://rutracker.org/forum/viewtopic.php?t={id}",
-        #         ids
-        #     ))
-        # else:
         if ids is None:
             self.ids = sorted(db_service.get_ids(), key=int, reverse=True)
         else:
