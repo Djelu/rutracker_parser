@@ -34,7 +34,7 @@ class Parser:
             for i in self.session:
                 if not self.session[i].closed:
                     await self.session[i].close()
-        book_urls_list = book_urls_list[0:2]
+        # book_urls_list = book_urls_list[0:2]
         try:
             books_data_list = await asyncio.gather(*[self.get_book_data(book_url) for book_url in book_urls_list])
         finally:
