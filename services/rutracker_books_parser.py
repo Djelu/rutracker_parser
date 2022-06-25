@@ -30,13 +30,18 @@ class Parser:
     async def run(self):
         try:
             book_urls_list = await self.get_book_url_list()
-            # book_urls_list = book_urls_list[0:2]
-            books_data_list = await asyncio.gather(*[self.get_book_data(book_url) for book_url in book_urls_list])
-            await self.export_to_db(books_data_list)
         finally:
             for i in self.session:
-                await self.session.get(i).close()
-                j = 0
+                if not self.session[i].closed:
+                    await self.session[i].close()
+        book_urls_list = book_urls_list[0:2]
+        try:
+            books_data_list = await asyncio.gather(*[self.get_book_data(book_url) for book_url in book_urls_list])
+        finally:
+            for book_url in book_urls_list:
+                if self.session[book_url] is not None and not self.session[book_url].closed:
+                    await self.session[book_url].close()
+        await self.export_to_db(books_data_list)
 
     async def export_to_db(self, books_data):
         if len(books_data) == 0:
@@ -50,20 +55,23 @@ class Parser:
     async def get_book_url_list(self):
         return self.flatten([await self.get_book_page_urls(page_index) for page_index in range(1, 11)])
 
-    async def get_page_content(self, book_url, page_index):
+    async def get_page_content(self, book_url, session_id, close_session=False):
         header = {'user-agent': self.user_agent}
-        if self.session.get(page_index) is None:
+        if self.session.get(session_id) is None:
             session = aiohttp.ClientSession(cookies=self.cookie, headers=header)
             data = {'login_username': f'{login_username}',
                     'login_password': f'{login_password}',
                     'login': f'{login}'}
             async with session.post(self.login_url, data=data) as login_resp:
                 if await login_resp.text():
-                    self.session[page_index] = session
+                    self.session[session_id] = session
                 else:
                     await session.close()
-        async with self.session[page_index].get(book_url) as resp:
-            return await resp.text()
+        async with self.session.get(session_id).get(book_url) as resp:
+            content = await resp.text()
+        if close_session and not self.session.get(session_id).closed:
+            await self.session.get(session_id).close()
+        return content
 
     def flatten(self, t):
         return [item for sublist in t for item in sublist]
@@ -77,7 +85,7 @@ class Parser:
         return f'https://rutracker.org/forum/{elems[page_index].attrs["href"]}'
 
     async def get_book_page_urls(self, page_index):
-        content = await self.get_page_content(await self.get_url(page_index), page_index)
+        content = await self.get_page_content(await self.get_url(page_index), page_index, True)
         soup = BeautifulSoup(content, "html.parser")
         table = soup.find("table", {"id": "tor-tbl"})
         elems = table.find_all("a", {"class": "bold"})
@@ -95,7 +103,7 @@ class Parser:
 
     async def get_book_data(self, book_page_url):
         book_data = {}
-        content = await self.get_page_content(book_page_url, 0)
+        content = await self.get_page_content(book_page_url, book_page_url, True)
         soup = BeautifulSoup(content, "html.parser")
         root_item = soup.find("div", {"class": "post_body"})
         if root_item is None:
