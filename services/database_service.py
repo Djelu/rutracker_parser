@@ -167,7 +167,7 @@ def json_to_db(data):
     columns_for_insert = f"id,{','.join(columns)}"
     values = map(get_values, data)
     query = f"INSERT INTO {table_name} ({columns_for_insert}) VALUES " + ",".join(values)
-    print(query)
+    # print(query)
     return execute_query(query)
 
 
